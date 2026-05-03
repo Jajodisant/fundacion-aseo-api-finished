@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Admin - Puntos Críticos - Fundación Aseo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; }
+        header {
+            background: #1a6b3c;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 { font-size: 1.1rem; }
+        #contador {
+            background: white;
+            color: #333;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        #map { height: calc(100vh - 50px); width: 100%; }
+
+        /* Popup image */
+        .popup-img {
+            max-width: 200px;
+            max-height: 160px;
+            display: block;
+            margin: 6px 0;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .popup-no-img {
+            color: #888;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+        .btn-completar {
+            margin-top: 8px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        .btn-completar:disabled { background: #aaa; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🗺️ Mapa Admin — Puntos Críticos · Fundación, Magdalena</h1>
+        <span id="contador">Cargando...</span>
+    </header>
+    <div id="map"></div>
+
+    <script>
+        // ── Mapa ──────────────────────────────────────────────────────────
+        const map = L.map('map').setView([10.5172, -74.1922], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19
+        }).addTo(map);
+
+        // ── Capas por estado ───────────────────────────────────────────────
+        const layerPendiente  = L.layerGroup().addTo(map);
+        const layerCompletado = L.layerGroup().addTo(map);
+
+        L.control.layers(null, {
+            '🔴 Pendientes':  layerPendiente,
+            '🔵 Completados': layerCompletado
+        }, { collapsed: false }).addTo(map);
+
+        // ── Contadores ─────────────────────────────────────────────────────
+        let totalPendientes  = 0;
+        let totalCompletados = 0;
+
+        function actualizarContador() {
+            document.getElementById('contador').textContent =
+                'Pendientes: ' + totalPendientes + ' | Completados: ' + totalCompletados;
+        }
+
+        // ── Función para marcar completado ─────────────────────────────────
+        function marcarCompletado(id, btnId) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            btn.disabled = true;
+            btn.textContent = 'Actualizando...';
+
+            fetch('/api/reportes/' + id + '/estado', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: 'COMPLETADO' })
+            })
+            .then(function(res) {
+                if (!res.ok) throw new Error('Error del servidor: ' + res.status);
+                recargarMapa();
+            })
+            .catch(function(err) {
+                alert('Error al actualizar: ' + err.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '✅ Marcar como COMPLETADO';
+                }
+            });
+        }
+
+        // ── Carga de marcadores ────────────────────────────────────────────
+        async function cargarMarcadores(estado) {
+            let markersData = [];
+            try {
+                const response = await fetch('/api/reportes/admin/reportes-mapa?estado=' + estado);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                markersData = await response.json();
+            } catch (err) {
+                console.error('Error cargando ' + estado + ':', err);
+                alert('No se pudo cargar los reportes ' + estado + ': ' + err.message);
+                return;
+            }
+
+            const layer      = estado === 'PENDIENTE' ? layerPendiente : layerCompletado;
+            const color      = estado === 'PENDIENTE' ? '#e53935' : '#1565C0';
+            layer.clearLayers();
+
+            markersData.forEach(function(data) {
+                // Construir imagen
+                let imgHtml = '<span class="popup-no-img">Sin imagen</span>';
+                if (data.imagenB64 && data.tipoContenido) {
+                    imgHtml = '<img class="popup-img" src="data:' + data.tipoContenido + ';base64,' + data.imagenB64 + '" alt="Foto reporte" />';
+                }
+
+                // Botón completar (solo para PENDIENTE)
+                let btnHtml = '';
+                if (estado === 'PENDIENTE') {
+                    const btnId = 'btn-' + data.id;
+                    btnHtml = '<button id="' + btnId + '" class="btn-completar" ' +
+                              'onclick="marcarCompletado(' + data.id + ', \'' + btnId + '\')">✅ Marcar como COMPLETADO</button>';
+                }
+
+                const popupContent =
+                    '<b>ID: ' + data.id + '</b><br>' +
+                    'Estado: <b>' + data.estado + '</b><br>' +
+                    'Lat: ' + data.lat + ', Lon: ' + data.lon + '<br>' +
+                    imgHtml +
+                    btnHtml;
+
+                L.circleMarker([data.lat, data.lon], {
+                    color:       color,
+                    fillColor:   color,
+                    fillOpacity: 0.85,
+                    radius:      10,
+                    weight:      2
+                }).bindPopup(popupContent, { maxWidth: 240 }).addTo(layer);
+            });
+
+            if (estado === 'PENDIENTE') totalPendientes  = markersData.length;
+            else                        totalCompletados = markersData.length;
+            actualizarContador();
+            console.log('Marcadores ' + estado + ' cargados: ' + markersData.length);
+        }
+
+        // ── Recarga completa ───────────────────────────────────────────────
+        async function recargarMapa() {
+            totalPendientes  = 0;
+            totalCompletados = 0;
+            actualizarContador();
+            layerPendiente.clearLayers();
+            layerCompletado.clearLayers();
+            await Promise.all([
+                cargarMarcadores('PENDIENTE'),
+                cargarMarcadores('COMPLETADO')
+            ]);
+        }
+
+        // ── Inicio ─────────────────────────────────────────────────────────
+        recargarMapa();
+    </script>
+</body>
+</html>
