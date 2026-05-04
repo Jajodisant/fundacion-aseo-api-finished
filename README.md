@@ -73,7 +73,7 @@ fundacion-aseo-api/
 ```bash
 # 1. Clonar el repositorio
 git clone https://github.com/Jajodisant/fundacion-aseo-api-finished.git
-cd fundacion-aseo-api
+cd fundacion-aseo-api-finished
 
 # 2. Iniciar la base de datos local con Docker
 docker compose -f docker-compose-local.yml up -d
