@@ -1,0 +1,21 @@
+services:
+  postgres-local:
+    image: postgis/postgis:16-3.4
+    container_name: fundacion-aseo-postgres-local
+    environment:
+      POSTGRES_DB: fundacion_aseo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+      - ./init-local-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fundacion_aseo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_local_data:
