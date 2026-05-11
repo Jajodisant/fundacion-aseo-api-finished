@@ -1,6 +1,6 @@
 # Fundación Aseo API 🚀
 
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-green.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.6-green.svg)](https://spring.io/projects/spring-boot)
 [![PostGIS](https://img.shields.io/badge/PostGIS-Enabled-blue.svg)](https://postgis.net/)
 [![Java 17](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -13,7 +13,7 @@ Permite a ciudadanos reportar puntos contaminados con ubicación geográfica, de
 ## 📁 Estructura del Proyecto
 
 ```
-fundacion-aseo-api/
+fundacion-aseo-api-finished/
 ├── pom.xml                              # Dependencias Maven (Spring Boot, PostGIS, Lombok, PG)
 ├── docker-compose-local.yml             # Docker PostgreSQL/PostGIS local
 ├── init-local-db.sql                    # Script de inicialización de la DB local
@@ -36,10 +36,10 @@ fundacion-aseo-api/
 │   │       ├── application.properties             # Config producción (env vars)
 │   │       ├── application-local.properties       # Config local Docker (puerto 5433)
 │   │       ├── schema.sql                         # DDL tabla reportes
-│   │       ├── data.sql                           # 7 reportes de prueba (local)
+│   │       ├── data.sql                           # 5 reportes de prueba (local)
 │   │       └── static/
 │   │           ├── reporte-ciudadano.html         # Formulario ciudadano
-│   │           └── mapa-admin.html                # Mapa Leaflet admin
+│   │           └── mapa-admin.html                # Mapa Leaflet admin con auto-centrado
 │   └── test/
 │       └── java/com/fundacion/aseo/
 │           └── FundacionAseoApiApplicationTests.java
@@ -58,14 +58,14 @@ fundacion-aseo-api/
 
 **Perfiles de configuración**:
 - `application.properties` — Producción (PostgreSQL configurable vía env vars).
-- `application-local.properties` — Local con Docker PostGIS en puerto 5433. Activar con `-Dspring.profiles.active=local`.
+- `application-local.properties` — Local con Docker PostGIS en puerto 5433. Ejecutar con el perfil `local`.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Requisitos
-- Java 17+, Maven 3.9+
+- Java 17+
 - Docker (para DB local)
 
 ### Pasos
@@ -79,12 +79,25 @@ cd fundacion-aseo-api-finished
 docker compose -f docker-compose-local.yml up -d
 
 # 3. Compilar
-mvn clean compile
+./mvnw clean compile
 
 # 4. Ejecutar con perfil local
-mvn spring-boot:run -Dspring.profiles.active=local
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 
 # Servidor disponible en: http://localhost:8080
+```
+
+### IntelliJ IDEA
+
+1. Importa el proyecto como Maven.
+2. Usa Java 17 o superior en el SDK del proyecto.
+3. Levanta PostgreSQL con `docker compose -f docker-compose-local.yml up -d`.
+4. Ejecuta `FundacionAseoApiApplication` con el perfil activo `local`.
+
+Si el puerto `8080` ya está ocupado, puedes arrancar la app en otro puerto:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local -Dspring-boot.run.arguments=--server.port=18080
 ```
 
 ### Producción (PostgreSQL externo / Supabase)
@@ -95,7 +108,7 @@ Configura las siguientes variables de entorno y ejecuta sin perfil:
 export SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:<puerto>/<db>
 export SPRING_DATASOURCE_USERNAME=<usuario>
 export SPRING_DATASOURCE_PASSWORD=<contraseña>
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 ---
@@ -107,7 +120,7 @@ mvn spring-boot:run
 | `http://localhost:8080/reporte-ciudadano.html` | Formulario para ciudadanos (foto + coordenadas) |
 | `http://localhost:8080/mapa-admin.html` | Mapa admin con marcadores por estado |
 
-El mapa admin muestra marcadores **rojos** (PENDIENTE) y **azules** (COMPLETADO). Haciendo clic en un marcador se abre un popup con la foto del reporte y un botón para marcarlo como completado.
+El mapa admin muestra marcadores **rojos** (PENDIENTE) y **azules** (COMPLETADO). Haciendo clic en un marcador se abre un popup con la foto del reporte y un botón para marcarlo como completado. El mapa se centra automáticamente en los reportes cargados, incluso si fueron registrados fuera del punto inicial del municipio.
 
 ---
 
@@ -144,7 +157,7 @@ curl -X PATCH http://localhost:8080/api/reportes/1/estado \
 ## 🧪 Tests
 
 ```bash
-mvn test
+./mvnw test
 ```
 
 ---
@@ -154,9 +167,11 @@ mvn test
 | Problema | Solución |
 |----------|----------|
 | Error de conexión DB local | Verificar `docker ps` y que el contenedor PostGIS esté corriendo |
-| No aparecen marcadores en el mapa | Confirmar que `data.sql` se ejecutó (`spring.sql.init.mode=always` en perfil local) |
+| Un reporte se registra pero no lo ves enseguida en el mapa | Recarga `mapa-admin.html`; el mapa se centra automáticamente en todos los marcadores cargados |
 | Error PostGIS | Verificar `/api/sistema/db/estado` |
-| Error al compilar | Ejecutar `mvn clean install` |
+| Error al iniciar con perfil `local` | Verificar que Docker esté arriba y ejecutar con `./mvnw spring-boot:run -Dspring-boot.run.profiles=local` |
+| El puerto `8080` ya está en uso | Ejecutar con `--server.port=18080` o libera el proceso que ocupa `8080` |
+| Error al compilar | Ejecutar `./mvnw clean install` |
 | Foto no visible en popup | Verificar que la imagen se guardó correctamente en la DB |
 
 ---

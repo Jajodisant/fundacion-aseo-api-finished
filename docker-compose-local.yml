@@ -1,7 +1,6 @@
 services:
   postgres-local:
     image: postgis/postgis:16-3.4
-    container_name: fundacion-aseo-postgres-local
     environment:
       POSTGRES_DB: fundacion_aseo
       POSTGRES_USER: postgres

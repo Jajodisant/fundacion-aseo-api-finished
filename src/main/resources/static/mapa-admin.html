@@ -91,6 +91,20 @@
                 'Pendientes: ' + totalPendientes + ' | Completados: ' + totalCompletados;
         }
 
+        function centrarMapa(coordenadas) {
+            if (coordenadas.length === 0) {
+                map.setView([10.5172, -74.1922], 14);
+                return;
+            }
+
+            if (coordenadas.length === 1) {
+                map.setView(coordenadas[0], 15);
+                return;
+            }
+
+            map.fitBounds(L.latLngBounds(coordenadas), { padding: [30, 30] });
+        }
+
         // ── Función para marcar completado ─────────────────────────────────
         function marcarCompletado(id, btnId) {
             const btn = document.getElementById(btnId);
@@ -126,14 +140,18 @@
             } catch (err) {
                 console.error('Error cargando ' + estado + ':', err);
                 alert('No se pudo cargar los reportes ' + estado + ': ' + err.message);
-                return;
+                return [];
             }
 
             const layer      = estado === 'PENDIENTE' ? layerPendiente : layerCompletado;
             const color      = estado === 'PENDIENTE' ? '#e53935' : '#1565C0';
+            const coordenadas = [];
             layer.clearLayers();
 
             markersData.forEach(function(data) {
+                const latLng = [data.lat, data.lon];
+                coordenadas.push(latLng);
+
                 // Construir imagen
                 let imgHtml = '<span class="popup-no-img">Sin imagen</span>';
                 if (data.imagenB64 && data.tipoContenido) {
@@ -155,7 +173,7 @@
                     imgHtml +
                     btnHtml;
 
-                L.circleMarker([data.lat, data.lon], {
+                L.circleMarker(latLng, {
                     color:       color,
                     fillColor:   color,
                     fillOpacity: 0.85,
@@ -168,6 +186,7 @@
             else                        totalCompletados = markersData.length;
             actualizarContador();
             console.log('Marcadores ' + estado + ' cargados: ' + markersData.length);
+            return coordenadas;
         }
 
         // ── Recarga completa ───────────────────────────────────────────────
@@ -177,10 +196,11 @@
             actualizarContador();
             layerPendiente.clearLayers();
             layerCompletado.clearLayers();
-            await Promise.all([
+            const coordenadasPorEstado = await Promise.all([
                 cargarMarcadores('PENDIENTE'),
                 cargarMarcadores('COMPLETADO')
             ]);
+            centrarMapa(coordenadasPorEstado.flat());
         }
 
         // ── Inicio ─────────────────────────────────────────────────────────
